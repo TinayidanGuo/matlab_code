@@ -4,7 +4,7 @@ clear;
 clc;
 
 %% Settings of parameter matrices and vectors
-n=3;
+n=10;
 BB = zeros(n,n);
 S = zeros(n,n);
 e_1=zeros(n,1);
@@ -42,128 +42,105 @@ e_1(1,1)=1;
 %% Settings of initial values
 
 xup=zeros(n,1);
-x=xup; 
-xlw=xup;
-% xlw=[1:n]';
+x=zeros(n,1); 
 xstar=[1:n]';
 maxIter=500;
-L = 100;
-M=L*L;
+L_prev = 5;
+L=10;
+M=L;
+%M=100; %L starting at 10, find L=80
+%M=.1; %L starting at 10, find L=5
 gamma=1;
-Gamma = L;
-%iter =0;
-%h = 1/L;%h>1/L
+
 
   format long
  
 %% Define functions
 % define f function 
-  f = @(x)((L/80)*x'*BB*x-(L/40)*e_n'*x);
-  gradf =@(x)((L/40)*BB*x-(L/40)*e_n); 
+  f = @(x)((L/8)*x'*BB*x-(L/4)*e_n'*x);
+  gradf =@(x)((L/4)*BB*x-(L/4)*e_n); 
     
 % define g function
-  g = @(x)((M/80)*x'*S*x-(M/40)*(e_n-e_1)'*x);
-  gradg =@(x)((M/40)*S*x-(M/40)*(e_n-e_1)); 
+  g = @(x)((M/8)*x'*S*x-(M/4)*(e_n-e_1)'*x);
+  gradg =@(x)((M/4)*S*x-(M/4)*(e_n-e_1)); 
   
 % define phi function
   phi =@(x) (f(x) + g(x));
   gradphi =@(x) (gradf(x) + gradg(x));
   
-  vec_fx = zeros(maxIter,1);
-  vec_ec = zeros(maxIter,1);
-  vec_tmp = zeros(maxIter,1);
+
   
 %% Backtracking linesearch for L
-lhs = phi(xup)- phi(xlw)- (xup-xlw)'*gradphi(xlw);
-rhs = norm(xup-xlw)^2;
+% Define lhs = phi(xup)- phi(xlw)- (xup-xlw)'*gradphi(xlw);
+% and rhs = norm(xup-xlw)^2;
+% then L >= 2*lhs/rhs, true;
+% vec_x = zeros(n,maxIter);
+% vec_xup = zeros(n,maxIter);
+% vec_gamma = zeros(maxIter);
+% vec_fx = zeros(maxIter,1);
+% vec_ec = zeros(maxIter,1);
 
-for   iter =1:maxIter
-      beta = (2*L)/iter; 
-      xlw=(1-gamma)*xup + gamma*x;
-      d = gradphi(xlw);
-      x = x - (1/beta)*d;
-      xup=(1-gamma)*xup + gamma*x;
-      r = Gamma/L;
-      gamma = sqrt(r+r^2/4)- r/2;
-      lhs = phi(xup)- phi(xlw)- (xup-xlw)'*gradphi(xlw);
-      rhs = norm(xup-xlw)^2;
-	  tmp=2*lhs/rhs;
-      vec_tmp(iter) = tmp;
-	  L = max(tmp,L);
-      Gamma = L*gamma^2;
-end 
-L %L~=700, when L0=100, M=L^2
-% When L=10, even M=L^2 does not update L
-plot(vec_tmp);
+vec_L = zeros(maxIter,1);
+vec_ratio = zeros(maxIter,1);
 
-
-% while ~(L>=2*lhs/rhs) && iter < maxIter
-%       iter;
-%       iter = iter + 1;
-%       beta = (2*L)/iter; 
-%       xlw=(1-gamma)*xup + gamma*x;
-%       d = gradphi(xlw);
-%       x = x - (1/beta)*d;
-%       xup=(1-gamma)*xup + gamma*x;
-%       r = Gamma/L;
-%       gamma = sqrt(r+r^2/4)- r/2;
-%       Gamma = L*gamma^2;
-%       lhs = phi(xup)- phi(xlw)- (xup-xlw)'*gradphi(xlw);
-%       rhs = norm(xup-xlw)^2;
-% end 
-
-%% Define functions
-% define f function 
-  f = @(x)((L/80)*x'*BB*x-(L/40)*e_n'*x);
-  gradf =@(x)((L/40)*BB*x-(L/40)*e_n); 
-    
-% define g function
-  g = @(x)((M/80)*x'*S*x-(M/40)*(e_n-e_1)'*x);
-  gradg =@(x)((M/40)*S*x-(M/40)*(e_n-e_1)); 
-  
-% define phi function
-  phi =@(x) (f(x) + g(x));
-  gradphi =@(x) (gradf(x) + gradg(x));
-  
-%% iteration of Nesterov's method algorithm
 tic
-  for iter =1:maxIter
-      lambda = 2/(iter+1);
-      gamma = lambda;
-      beta = (2*L)/iter; %Works when (20*L)/iter
-      xlw=(1-lambda)*xup + lambda*x;
-      d = gradphi(xlw);
-      x = x - (1/beta)*d;
-      xup=(1-gamma)*xup + gamma*x;
-      %save obj value and eclapse time of each iter
-      fx = phi(xup);
-      vec_fx(iter) = fx;
-      vec_ec(iter)= toc;
-      iter;
-      max(xup); % increases at an increase rate 
-      f(xstar)-f(xup); %diverges at iter=4   
-  end  
-  xup;
-  max(xup)
-  f(xup)-f(xstar);
-  
+for   iter =1:maxIter    
+      xup_prev= xup;
+      x_prev =x;
+      gamma_prev = gamma;
+      L = .5*L_prev; 
+      while true         
+          beta = 2*L/iter;
+          r = L_prev/L;
+          gamma = (-r*gamma_prev^2+sqrt(r^2*gamma_prev^4 + 4*r*gamma_prev^2))/2;        
+          xlw=(1-gamma)*xup_prev + gamma*x_prev;
+          d = gradphi(xlw);
+          x = x_prev - (1/beta)*d;
+          xup=(1-gamma)*xup_prev + gamma*x;
+          lhs = phi(xup)- phi(xlw)- (xup-xlw)'*d;
+          rhs = norm(xup-xlw)^2;
+          ratio = 2*lhs/rhs;   
+          vec_L(iter) = L;
+          vec_ratio(iter)=ratio;       
+          if lhs <= L*rhs/2
+              break;
+          else
+              L = 2*L; %L_k <=2*L
+          end         
+      end  
+      L_prev = L;
+%      vec_ec(iter)= toc;
+end  
+%Now xup=xlw is the optimal solution
+%L =10 is found out
   %% plot L value and objective value
-  tiledlayout(3,1);
+  figure
+  tiledlayout(2,1);
   nexttile
-  vec_tmp =vec_tmp(1:iter);
-  plot(vec_tmp) 
-  
-  nexttile
-  vec_fx = vec_fx(1:iter);
-  plot(vec_fx);
-  
-  nexttile
-  vec_ec =vec_ec(1:iter);
-  plot(vec_ec,vec_fx)
+  vec_L =vec_L(1:iter);
+  %legend({'y = sin(x)','y = cos(x)'},'Location','southwest')
+  plot(vec_L) 
+  title('L vs iteration')
 
 
-%% Remark:
-% Setting function Lip half doesn't work without beta *10, 
-% solution is to shrink funtion Lip by 10 times to trade off beta change.
-% Now it even works with n=1000, iter=50000
+  nexttile
+  vec_ratio =vec_ratio(1:iter);
+  %legend({'y = sin(x)','y = cos(x)'},'Location','southwest')
+  plot(vec_ratio) 
+  title('ratio vs iteration')
+
+%%
+%   nexttile
+%   vec_fx = vec_fx(1:iter);
+%   plot(vec_fx);
+%   title('objective value vs iteration')
+%   
+%   nexttile
+%   vec_ec =vec_ec(1:iter);
+%   plot(vec_ec,vec_fx)
+%   title('objective value vs eclapse time')
+%% Debug
+% plot(vec_L(1:200))
+% find(vec_L > 100,1)
+% find(vec_ratio < vec_L,1)  
  
